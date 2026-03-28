@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Notes</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --bg-sidebar: #161b22;
+      --bg-card: #1c2128;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --active: #1f3a5f;
+      --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Agent sidebar */
+    #agent-sidebar {
+      width: 140px;
+      flex-shrink: 0;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 8px;
+      gap: 4px;
+    }
+
+    #agent-sidebar h2 {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 0 8px 8px;
+    }
+
+    .agent-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-family: var(--font-sans);
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .agent-btn:hover { background: var(--bg-card); color: var(--text); }
+    .agent-btn.active { background: var(--active); color: var(--accent); font-weight: 500; }
+    .agent-btn.unavailable { opacity: 0.4; cursor: default; }
+
+    /* File tree panel */
+    #file-panel {
+      width: 240px;
+      flex-shrink: 0;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #file-panel-header {
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #file-panel-header h2 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      flex: 1;
+    }
+
+    #file-search {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      padding: 5px 9px;
+      border-radius: 5px;
+      width: 100%;
+      margin: 0 14px 10px;
+      outline: none;
+      font-family: var(--font-sans);
+    }
+    #file-search:focus { border-color: var(--accent); }
+
+    #file-tree {
+      overflow-y: auto;
+      flex: 1;
+      padding: 6px 0;
+    }
+
+    #file-tree::-webkit-scrollbar { width: 6px; }
+    #file-tree::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .tree-empty {
+      padding: 20px 16px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .tree-dir {
+      user-select: none;
+    }
+
+    .tree-dir-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      border-radius: 4px;
+      margin: 0 4px;
+    }
+    .tree-dir-label:hover { background: var(--bg-card); color: var(--text); }
+
+    .tree-dir-label .arrow {
+      font-size: 10px;
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+    .tree-dir.collapsed > .tree-dir-label .arrow { transform: rotate(-90deg); }
+    .tree-dir.collapsed > .tree-children { display: none; }
+
+    .tree-children { padding-left: 14px; }
+
+    .tree-file {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 12.5px;
+      color: var(--text);
+      border-radius: 4px;
+      margin: 0 4px;
+      transition: background 0.1s;
+    }
+    .tree-file:hover { background: var(--bg-card); }
+    .tree-file.active { background: var(--active); color: var(--accent); }
+
+    .tree-icon { font-size: 12px; flex-shrink: 0; }
+
+    /* Content area */
+    #content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #content-header {
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 49px;
+    }
+
+    #breadcrumb {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    #breadcrumb span { color: var(--text); }
+
+    #content-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 40px;
+    }
+
+    #content-body::-webkit-scrollbar { width: 8px; }
+    #content-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    #content-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+
+    #content-placeholder .big-icon { font-size: 48px; opacity: 0.3; }
+    #content-placeholder p { font-size: 14px; }
+
+    /* Markdown styles */
+    #markdown-output {
+      max-width: 820px;
+      line-height: 1.7;
+    }
+
+    #markdown-output h1 { font-size: 2em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; margin: 0 0 1em; color: #e6edf3; }
+    #markdown-output h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; margin: 1.5em 0 0.8em; color: #e6edf3; }
+    #markdown-output h3 { font-size: 1.25em; margin: 1.3em 0 0.6em; color: #e6edf3; }
+    #markdown-output h4, #markdown-output h5, #markdown-output h6 { margin: 1.2em 0 0.5em; color: #e6edf3; }
+
+    #markdown-output p { margin: 0.8em 0; }
+    #markdown-output a { color: var(--accent); text-decoration: none; }
+    #markdown-output a:hover { text-decoration: underline; color: var(--accent-hover); }
+
+    #markdown-output ul, #markdown-output ol { padding-left: 1.8em; margin: 0.6em 0; }
+    #markdown-output li { margin: 0.3em 0; }
+
+    #markdown-output code {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.15em 0.45em;
+      font-family: var(--font-mono);
+      font-size: 0.875em;
+    }
+
+    #markdown-output pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 1em 0;
+    }
+
+    #markdown-output pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 0.875em;
+      line-height: 1.6;
+    }
+
+    #markdown-output blockquote {
+      border-left: 3px solid var(--accent);
+      padding: 4px 16px;
+      margin: 1em 0;
+      color: var(--text-muted);
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+    }
+
+    #markdown-output table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1em 0;
+    }
+
+    #markdown-output th, #markdown-output td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    #markdown-output th {
+      background: var(--bg-card);
+      font-weight: 600;
+    }
+
+    #markdown-output tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+    #markdown-output hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2em 0;
+    }
+
+    #markdown-output img { max-width: 100%; border-radius: 6px; }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-muted);
+      font-size: 14px;
+      padding: 40px 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+  </style>
+</head>
+<body>
+
+<nav id="agent-sidebar">
+  <h2>Agents</h2>
+</nav>
+
+<div id="file-panel">
+  <div id="file-panel-header">
+    <h2>Files</h2>
+  </div>
+  <input type="text" id="file-search" placeholder="Filter files…" autocomplete="off">
+  <div id="file-tree">
+    <div class="tree-empty">Select an agent to browse files.</div>
+  </div>
+</div>
+
+<div id="content-area">
+  <div id="content-header">
+    <div id="breadcrumb">Select a file to read</div>
+  </div>
+  <div id="content-body">
+    <div id="content-placeholder">
+      <div class="big-icon">📄</div>
+      <p>Pick an agent and a markdown file from the sidebar.</p>
+    </div>
+    <div id="markdown-output" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+  let currentAgent = null;
+  let currentFile = null;
+  let fullTree = [];
+
+  const agentSidebar = document.getElementById('agent-sidebar');
+  const fileTree = document.getElementById('file-tree');
+  const fileSearch = document.getElementById('file-search');
+  const breadcrumb = document.getElementById('breadcrumb');
+  const contentPlaceholder = document.getElementById('content-placeholder');
+  const markdownOutput = document.getElementById('markdown-output');
+
+  async function init() {
+    try {
+      const res = await fetch('/api/agents');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const agents = await res.json();
+      agents.forEach(agent => {
+        const btn = document.createElement('button');
+        btn.className = 'agent-btn' + (agent.exists ? '' : ' unavailable');
+        btn.textContent = agent.name;
+        btn.dataset.id = agent.id;
+        if (agent.exists) {
+          btn.addEventListener('click', () => selectAgent(agent.id, btn));
+        } else {
+          btn.title = 'Workspace not found';
+        }
+        agentSidebar.appendChild(btn);
+      });
+    } catch (err) {
+      const msg = document.createElement('div');
+      msg.style.cssText = 'color:#f85149;font-size:12px;padding:8px 10px;';
+      msg.textContent = 'Failed to load agents.';
+      agentSidebar.appendChild(msg);
+    }
+  }
+
+  async function selectAgent(agentId, btn) {
+    if (currentAgent === agentId) return;
+    currentAgent = agentId;
+    currentFile = null;
+    document.querySelectorAll('.agent-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    fileSearch.value = '';
+    fileTree.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+
+    try {
+      const res = await fetch(`/api/files?agent=${agentId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      fullTree = await res.json();
+      renderTree(fullTree, '');
+    } catch (err) {
+      fileTree.innerHTML = '<div class="tree-empty" style="color:#f85149">Failed to load files.</div>';
+    }
+  }
+
+  function filterTree(nodes, query) {
+    if (!query) return nodes;
+    const q = query.toLowerCase();
+    const result = [];
+    for (const node of nodes) {
+      if (node.type === 'dir') {
+        const children = filterTree(node.children, q);
+        if (children.length) result.push({ ...node, children });
+      } else {
+        if (node.name.toLowerCase().includes(q)) result.push(node);
+      }
+    }
+    return result;
+  }
+
+  function renderTree(nodes, filterQuery) {
+    const filtered = filterTree(nodes, filterQuery);
+    if (!filtered.length) {
+      fileTree.innerHTML = '<div class="tree-empty">No markdown files found.</div>';
+      return;
+    }
+    fileTree.innerHTML = '';
+    fileTree.appendChild(buildTreeNodes(filtered, filterQuery !== ''));
+  }
+
+  function buildTreeNodes(nodes, forceExpand) {
+    const frag = document.createDocumentFragment();
+    for (const node of nodes) {
+      if (node.type === 'dir') {
+        const dir = document.createElement('div');
+        dir.className = 'tree-dir';
+
+        const label = document.createElement('div');
+        label.className = 'tree-dir-label';
+        label.innerHTML = `<span class="arrow">▾</span><span class="tree-icon">📁</span>${escHtml(node.name)}`;
+        label.addEventListener('click', () => dir.classList.toggle('collapsed'));
+
+        const children = document.createElement('div');
+        children.className = 'tree-children';
+        children.appendChild(buildTreeNodes(node.children, forceExpand));
+
+        dir.appendChild(label);
+        dir.appendChild(children);
+        frag.appendChild(dir);
+      } else {
+        const file = document.createElement('div');
+        file.className = 'tree-file' + (node.path === currentFile ? ' active' : '');
+        file.innerHTML = `<span class="tree-icon">📝</span>${escHtml(node.name)}`;
+        file.dataset.path = node.path;
+        file.addEventListener('click', () => openFile(node.path, file));
+        frag.appendChild(file);
+      }
+    }
+    return frag;
+  }
+
+  async function openFile(filePath, fileEl) {
+    if (currentFile === filePath) return;
+    currentFile = filePath;
+    document.querySelectorAll('.tree-file').forEach(f => f.classList.remove('active'));
+    fileEl.classList.add('active');
+
+    breadcrumb.innerHTML = filePath.split('/').map((p, i, arr) =>
+      i === arr.length - 1 ? `<span>${escHtml(p)}</span>` : escHtml(p)
+    ).join(' / ');
+
+    contentPlaceholder.style.display = 'none';
+    markdownOutput.style.display = 'none';
+    markdownOutput.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+    markdownOutput.style.display = 'block';
+
+    const res = await fetch(`/api/file?agent=${currentAgent}&path=${encodeURIComponent(filePath)}`);
+    if (!res.ok) {
+      markdownOutput.innerHTML = '<p style="color:#f85149">Failed to load file.</p>';
+      return;
+    }
+    const data = await res.json();
+    markdownOutput.innerHTML = DOMPurify.sanitize(data.html);
+    markdownOutput.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+  }
+
+  fileSearch.addEventListener('input', () => {
+    if (!currentAgent) return;
+    renderTree(fullTree, fileSearch.value.trim());
+  });
+
+  function escHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  init();
+</script>
+</body>
+</html>

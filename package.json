@@ -1,0 +1,17 @@
+{
+  "name": "agent-notes-viewer",
+  "version": "1.0.0",
+  "description": "Web viewer for OpenClaw agent workspace markdown files",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "marked": "^9.1.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "playwright": "^1.58.2"
+  }
+}
